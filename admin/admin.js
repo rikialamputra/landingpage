@@ -77,28 +77,17 @@ function apache(d){
   "</VirtualHost>"
  ].join("\n");
  return [
-  "#!/usr/bin/env bash",
-  "set -Eeuo pipefail",
-  "# Jalankan sebagai root pada server Apache.",
-  "SITE_FILE=/etc/apache2/sites-available/"+site,
-  "SSL_SITE_FILE=/etc/apache2/sites-available/"+sslSite,
+  "a2dissite "+site,
+  "a2dissite "+sslSite,
+  "rm /etc/apache2/sites-available/"+site,
+  "rm /etc/apache2/sites-available/"+sslSite,
   "",
-  "# Nonaktifkan konfigurasi lama khusus pelanggan ini jika ada.",
-  "a2dissite "+site+" 2>/dev/null || true",
-  "a2dissite "+sslSite+" 2>/dev/null || true",
-  "rm -f \"$SITE_FILE\" \"$SSL_SITE_FILE\"",
-  "",
-  "a2enmod proxy proxy_http headers rewrite",
-  "",
-  "cat > \"$SITE_FILE\" <<'APACHE_EOF'",
+  "sudo tee /etc/apache2/sites-available/"+site+" > /dev/null <<'EOF'",
   ...vhost.split("\n"),
-  "APACHE_EOF",
+  "EOF",
   "",
   "a2ensite "+site,
-  "apache2ctl configtest",
   "service apache2 restart",
-  "",
-  "# Pastikan DNS mengarah ke server Apache dan port 80/443 terbuka.",
   "certbot --apache -d "+domain
  ].join("\n");
 }
