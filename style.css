@@ -1247,3 +1247,23 @@ h1,h2,h3,h4,h5,h6 { letter-spacing: -.035em; }
 @media (prefers-reduced-motion: reduce) {
     *,*::before,*::after { scroll-behavior:auto !important; animation-duration:.01ms !important; transition-duration:.01ms !important; }
 }
+
+
+/* Portfolio contrast fix: keep category badges fully opaque over imagery */
+.portfolio .section-subtitle { color:#536257; }
+.portfolio .portfolio-title { color:#1c3026; }
+.portfolio .portfolio-description { color:#46564a; }
+.portfolio .portfolio-overlay {
+    opacity:1;
+    background:linear-gradient(135deg,rgba(23,61,50,.16),rgba(16,31,25,.24));
+}
+.portfolio-card:hover .portfolio-overlay {
+    opacity:1;
+    background:linear-gradient(135deg,rgba(23,61,50,.24),rgba(16,31,25,.34));
+}
+.portfolio .portfolio-category {
+    opacity:1;
+    background:#d2b77f;
+    color:#17251f;
+    font-weight:700;
+}
