@@ -24,7 +24,7 @@
     <main class="main">
       <header class="topbar">
         <div><div class="eyebrow">ALAMHOST / INTERNAL TOOLS</div><h1>Mikhmon Provisioning</h1></div>
-        <div class="top-actions"><span class="env-chip"><i></i> DEVELOPMENT</span><a class="back-link" href="../index.html">↗ Landing page</a></div>
+        <div class="top-actions"><button type="button" class="theme-btn" id="themeToggle" aria-label="Ganti tema"><span id="themeIcon">☀</span><span id="themeLabel">Light mode</span></button><span class="env-chip"><i></i> DEVELOPMENT</span><a class="back-link" href="../index.html">↗ Landing page</a></div>
       </header>
 
       <section class="intro">
@@ -41,7 +41,7 @@
             <div class="field-grid">
               <label class="field"><span>Username pelanggan *</span><input id="username" value="gassp5" required pattern="[a-zA-Z0-9_-]{3,32}" autocomplete="off"><small>Dipakai untuk nama folder, container, dan subdomain.</small></label>
               <label class="field"><span>Versi RouterOS *</span><select id="ros"><option value="7">RouterOS 7</option><option value="6">RouterOS 6</option></select></label>
-              <label class="field full"><span>Docker VM tujuan *</span><select id="dockerVm"><option value="vm1">Docker VM 1 — 192.168.200.177</option><option value="vm2">Docker VM 2 — IP diatur di backend</option><option value="vm3">Docker VM 3 — IP diatur di backend</option></select><small>Pemilihan VM manual. IP dan SSH key dikelola di konfigurasi backend, bukan browser.</small></label>
+              <label class="field full"><span>Docker VM tujuan *</span><select id="dockerVm"><option value="vm1">Docker VM 1 — 192.168.200.177</option><option value="vm2">Docker VM 2 — 192.168.200.152</option><option value="vm3">Docker VM 3 — 192.168.200.182</option></select><small>Pemilihan VM manual. IP dan SSH key dikelola di konfigurasi backend, bukan browser.</small></label>
               <label class="field"><span>IP VPN pelanggan *</span><input id="vpnIp" value="10.5.0.149" inputmode="decimal" required></label>
               <label class="field"><span>IP Docker host</span><input id="dockerIp" placeholder="Diisi otomatis dari konfigurasi backend" disabled></label>
               <label class="field"><span>Port host Docker *</span><input id="dockerPort" type="number" min="1" max="65535" value="8290" required></label>
@@ -61,7 +61,11 @@
               <label class="field"><span>Target OLT port</span><input id="targetOlt" type="number" value="80"></label>
             </div>
 
-            <div class="section-head subhead"><div><span class="step">03</span><h3>Informasi akses pelanggan</h3></div></div>
+                        <div class="section-head subhead"><div><span class="step">03</span><h3>Port forwarding tambahan</h3></div><button type="button" class="btn btn-add" id="addForward">+ Tambah port</button></div>
+            <p class="section-hint">Tambahkan forwarding TCP/UDP lain ke IP VPN pelanggan yang sama. API dan Winbox di atas tetap tersedia.</p>
+            <div id="forwardList" class="forward-list"></div>
+
+            <div class="section-head subhead"><div><span class="step">04</span><h3>Informasi akses pelanggan</h3></div></div>
             <div class="field-grid">
               <label class="field"><span>Username Mikhmon</span><input id="mikhmonUser" value="mikhmon"></label>
               <label class="field"><span>Password Mikhmon</span><input id="mikhmonPass" type="password" placeholder="Isi saat backend sudah dikonfigurasi"></label>
