@@ -33,7 +33,7 @@ function dockerScript(d){
  const image=d.ros==="7"?"stbbaru2024/mikhmonros7":"animegasan/mikhmon:v3-latest";
  const volume=d.ros==="7"?"./mikhmon-data-"+folder+":/var/www/html":"./mikhmon-data/"+folder+":/opt/mikhmon/data";
  const service=d.ros==="7"?"mikhmon":container;
- const compose="version: '"+(d.ros==="7"?"3.9":"3.8")+"'\\nservices:\\n  "+service+":\\n    image: "+image+"\\n    container_name: "+container+"\\n    ports:\\n      - '"+d.dockerPort+":80'\\n    volumes:\\n      - "+volume+"\\n    restart: unless-stopped\\n";
+ const compose="version: '"+(d.ros==="7"?"3.9":"3.8")+"'\nservices:\n  "+service+":\n    image: "+image+"\n    container_name: "+container+"\n    ports:\n      - '"+d.dockerPort+":80'\n    volumes:\n      - "+volume+"\n    restart: unless-stopped\n";
  const path=base+"/"+folder,cron=path+"/auto_restart.sh",log=path+"/restart_log.txt";
  const q=v=>"'"+String(v).replace(/'/g,"'\\''")+"'";
  const lines=["#!/usr/bin/env bash","set -Eeuo pipefail","BASE_DIR="+q(base),"TEMPLATE_DIR="+q(template),"CUSTOMER_DIR="+q(folder),"CONTAINER_NAME="+q(container),
@@ -42,7 +42,7 @@ function dockerScript(d){
  "command -v docker-compose >/dev/null 2>&1 || { echo 'docker-compose belum tersedia.' >&2; exit 1; }",
  "cp -a \"$TEMPLATE_DIR\" \"$CUSTOMER_DIR\"","cd \"$CUSTOMER_DIR\"",
  d.ros==="7"?"mv mikhmon-data "+q("mikhmon-data-"+folder):"mkdir -p "+q("mikhmon-data/"+folder),
- "cat > docker-compose.yml <<'COMPOSE_EOF'",...compose.trimEnd().split("\\n"),"COMPOSE_EOF","docker-compose up -d",
+ "cat > docker-compose.yml <<'COMPOSE_EOF'",...compose.trimEnd().split("\n"),"COMPOSE_EOF","docker-compose up -d",
  "cat > auto_restart.sh <<'RESTART_EOF'","#!/usr/bin/env bash","CONTAINER_NAME="+q(container),"URL="+q("http://localhost:"+d.dockerPort),"TIMEOUT=10","LOG_FILE="+q(log),
  "if ! docker inspect \"$CONTAINER_NAME\" >/dev/null 2>&1; then exit 0; fi","STARTED_AT=$(docker inspect -f '{{.State.StartedAt}}' \"$CONTAINER_NAME\")",
  "STARTED_SEC=$(date -d \"$STARTED_AT\" +%s 2>/dev/null || echo 0)","NOW_SEC=$(date +%s)","UPTIME_SEC=$((NOW_SEC - STARTED_SEC))",
@@ -51,7 +51,7 @@ function dockerScript(d){
  "if [[ \"$HTTP_CODE\" != 200 && \"$HTTP_CODE\" != 302 ]]; then"," echo \"$(date): Web hang (HTTP $HTTP_CODE). Restart container.\" >> \"$LOG_FILE\""," docker restart \"$CONTAINER_NAME\" >/dev/null","fi","RESTART_EOF","chmod +x auto_restart.sh",
  "CRON_LINE="+q("* * * * * "+cron+" >/dev/null 2>&1"),"(crontab -l 2>/dev/null | grep -Fv "+q(cron)+" || true; echo \"$CRON_LINE\") | crontab -",
  "docker ps --filter \"name=$CONTAINER_NAME\""];
- return lines.join("\\n");
+ return lines.join("\n");
 }
 function apache(d){
  const vmIp=vmInfo[d.vm].ip;
