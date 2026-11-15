@@ -26,7 +26,7 @@ services:
       - ./mikhmon-data/${d.username}:/opt/mikhmon/data
     restart: unless-stopped
 `;}
-function dockerScript(d){const base=d.ros==="7"?"/home/alam/mikhmon/":"/home/alam/mikhmon-alamhost/";const template=d.ros==="7"?"ros7":"ros6";let lines=[`cd ${base}`,`# Pastikan folder tujuan belum ada; jangan hapus data pelanggan yang sudah ada.`,`test ! -e "${d.username}" || { echo "Folder ${d.username} sudah ada; batalkan agar data tidak tertimpa."; exit 1; }`,`cp -a ${template} ${d.username}`];if(d.ros==="7")lines.push(`mv ${d.username}/mikhmon-data ${d.username}/mikhmon-data-${d.username}`);else lines.push(`mkdir -p ${d.username}/mikhmon-data/${d.username}`);lines.push(`cd ${d.username}`,`# Simpan docker-compose.yml hasil generator pada folder ini.`,`docker compose up -d`,`docker ps --filter "name=mikhmon-${d.username}"`);return lines.join("\n");}
+function dockerScript(d){const base=d.ros==="7"?"/home/alam/mikhmon/":"/home/alam/mikhmon-alamhost/";const template=d.ros==="7"?"ros7":"ros6";let lines=[`cd ${base}`,`# Pastikan folder tujuan belum ada; jangan hapus data pelanggan yang sudah ada.`,`test ! -e "${d.username}" || { echo "Folder ${d.username} sudah ada; batalkan agar data tidak tertimpa."; exit 1; }`,`cp -a ${template} ${d.username}`];if(d.ros==="7")lines.push(`mv ${d.username}/mikhmon-data ${d.username}/mikhmon-data-${d.username}`);else lines.push(`mkdir -p ${d.username}/mikhmon-data/${d.username}`);lines.push(`cd ${d.username}`,`# Simpan docker-compose.yml hasil generator pada folder ini.`,`docker-compose up -d`,`docker ps --filter "name=mikhmon-${d.username}"`);return lines.join("\n");}
 function apache(d){const host=vmInfo[d.vm].ip||"DOCKER_VM_IP_FROM_BACKEND";return `<VirtualHost *:80>
     ServerName ${d.domain}.alamhost.com
     ProxyPreserveHost Off
@@ -52,15 +52,15 @@ Username: ${d.username}
 Domain: ${d.domain}.alamhost.com
 Mikhmon: ${d.domain}.alamhost.com
 User: ${d.mikhmonUser}
-Password: ${d.mikhmonPass?"(diisi dari secret backend)":"(belum diatur)"}
+Password: ${d.mikhmonPass?"(atur manual di aplikasi Mikhmon)":"(belum diatur)"}
 
 API: ${d.domain}.alamhost.com:${d.publicApi}
 Winbox: ${d.domain}.alamhost.com:${d.publicWinbox}
 
 SCRIPT OPENVPN CLIENT (template dari config-mikhmon.src)
-interface ovpn-client add name=${d.username}@alamhost.com connect-to=${d.domain}.alamhost.com user=${d.vpnUser} password=<PASSWORD_DARI_BACKEND> disabled=no
+interface ovpn-client add name=${d.username}@alamhost.com connect-to=${d.domain}.alamhost.com user=${d.vpnUser} password=<ISI_PASSWORD_VPN> disabled=no
 
-Catatan: password tidak dimasukkan ke frontend atau file publik. Backend akan mengambil secret dari konfigurasi server saat integrasi aktif.`;}
+Catatan: kredensial perlu diisi dan dibagikan secara aman secara manual. Generator ini tidak terhubung ke backend secret.`;}
 function generate(){const d=data();const err=validate(d);if(err){toast(err);return;}state.outputs={docker:compose(d)+"\n\n# Provisioning steps\n"+dockerScript(d),apache:apache(d),nat:nat(d),client:client(d)};state.generated=true;$("outputState").textContent="Konfigurasi dibuat";$("outputState").style.color="var(--green)";render();$("outputs").scrollIntoView({behavior:"smooth",block:"start"});toast("Konfigurasi berhasil dibuat.");}
 function render(){const d=data();$("targetName").textContent=vmInfo[d.vm].name;$("targetIp").textContent=vmInfo[d.vm].ip||"IP dikelola backend";$("runtimeName").textContent="ROS "+d.ros+" · Docker";$("containerName").textContent="mikhmon-"+d.username;$("summaryPort").textContent=d.dockerPort+" → 80";$("summaryDomain").textContent=d.domain+".alamhost.com";if(state.generated){$("outputCode").textContent=state.outputs[state.active];$("outputTitle").textContent=({docker:"docker-compose.yml + provisioning",apache:"Apache VirtualHost",nat:"MikroTik NAT rules",client:"Informasi akses pelanggan"})[state.active];}}
 function toast(msg){const el=$("toast");el.textContent=msg;el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),2800);}
