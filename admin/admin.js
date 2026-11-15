@@ -55,7 +55,36 @@ function dockerScript(d){
 }
 function apache(d){
  const host=vmInfo[d.vm].ip, domain=d.domain+".alamhost.com", file=d.username+".conf";
- return "#!/usr/bin/env bash\nset -Eeuo pipefail\nDOMAIN="+domain+"\nVM_IP="+host+"\nDOCKER_PORT="+d.dockerPort+"\nSITE_FILE=/etc/apache2/sites-available/"+file+"\n\n a2enmod proxy proxy_http headers rewrite\ncat > \"$SITE_FILE\" <<'APACHE_EOF'\n<VirtualHost *:80>\n    ServerName "+domain+"\n    ProxyPreserveHost Off\n    RequestHeader set Host \""+host+":"+d.dockerPort+"\"\n    ProxyPass / http://"+host+":"+d.dockerPort+"/\n    ProxyPassReverse / http://"+host+":"+d.dockerPort+"/\n    ErrorLog \${APACHE_LOG_DIR}/"+d.username+"_error.log\n    CustomLog \${APACHE_LOG_DIR}/"+d.username+"_access.log combined\n</VirtualHost>\nAPACHE_EOF\na2ensite "+file+"\napache2ctl configtest\nsystemctl reload apache2\necho 'Pastikan DNS "+domain+" sudah mengarah ke server Apache sebelum menjalankan Certbot.'\ncertbot --apache -d "+domain+"\n";
+ const q=v=>"'"+String(v).replace(/'/g,"'\\''")+"'";
+ return [
+  "#!/usr/bin/env bash",
+  "set -Eeuo pipefail",
+  "if [[ \"$EUID\" -ne 0 ]]; then echo 'Jalankan script ini sebagai root (sudo -i).' >&2; exit 1; fi",
+  "for cmd in a2enmod a2ensite apache2ctl systemctl certbot; do command -v \"$cmd\" >/dev/null 2>&1 || { echo \"Perintah $cmd tidak ditemukan.\" >&2; exit 1; }; done",
+  "DOMAIN="+q(domain),
+  "VM_IP="+q(host),
+  "DOCKER_PORT="+q(d.dockerPort),
+  "SITE_FILE="+q("/etc/apache2/sites-available/"+file),
+  "echo 'Mengaktifkan modul Apache reverse proxy...'",
+  "a2enmod proxy proxy_http headers",
+  "cat > \"$SITE_FILE\" <<'APACHE_EOF'",
+  "<VirtualHost *:80>",
+  "    ServerName "+domain,
+  "    ProxyPreserveHost Off",
+  "    RequestHeader set Host \""+host+":"+d.dockerPort+"\"",
+  "    ProxyPass / http://"+host+":"+d.dockerPort+"/",
+  "    ProxyPassReverse / http://"+host+":"+d.dockerPort+"/",
+  "    ErrorLog \${APACHE_LOG_DIR}/"+d.username+"_error.log",
+  "    CustomLog \${APACHE_LOG_DIR}/"+d.username+"_access.log combined",
+  "</VirtualHost>",
+  "APACHE_EOF",
+  "a2ensite "+file,
+  "apache2ctl configtest",
+  "systemctl reload apache2",
+  "echo 'VirtualHost aktif. Pastikan DNS "+domain+" mengarah ke server Apache dan port 80/443 dapat diakses dari internet.'",
+  "certbot --apache -d "+domain,
+  "echo 'Selesai. Periksa akses https://"+domain+"'"
+ ].join("\\n")+"\\n";
 }
 function nat(d){const lines=[`/ip firewall nat add chain=dstnat dst-address=103.112.162.253 protocol=tcp dst-port=${d.publicApi} action=dst-nat to-addresses=${d.vpnIp} to-ports=${d.targetApi} comment="${d.username}| API"`,`/ip firewall nat add chain=dstnat dst-address=103.112.162.253 protocol=tcp dst-port=${d.publicWinbox} action=dst-nat to-addresses=${d.vpnIp} to-ports=${d.targetWinbox} comment="${d.username}| Winbox"`];if(d.enableOlt)lines.push(`/ip firewall nat add chain=dstnat dst-address=103.112.162.253 protocol=tcp dst-port=${d.publicOlt} action=dst-nat to-addresses=${d.vpnIp} to-ports=${d.targetOlt} comment="${d.username}| OLT"`);for(const p of d.forwards){if(p.publicPort&&p.targetPort){const note=(p.comment||"Custom forwarding").replace(/[^a-zA-Z0-9 _.-]/g,"").slice(0,32);lines.push(`/ip firewall nat add chain=dstnat dst-address=103.112.162.253 protocol=${p.protocol} dst-port=${p.publicPort} action=dst-nat to-addresses=${d.vpnIp} to-ports=${p.targetPort} comment="${d.username}| ${note}"`);}}return lines.join("\n");}
 function client(d){return `INFO AKSES PELANGGAN
