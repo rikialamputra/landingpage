@@ -53,25 +53,10 @@ function dockerScript(d){
  "docker ps --filter \"name=$CONTAINER_NAME\""];
  return lines.join("\\n");
 }
-function apache(d){const host=vmInfo[d.vm].ip||"DOCKER_VM_IP_FROM_BACKEND";return `<VirtualHost *:80>
-    ServerName ${d.domain}.alamhost.com
-    ProxyPreserveHost Off
-    RequestHeader set Host "${host}:${d.dockerPort}"
-    ProxyPass / http://${host}:${d.dockerPort}/
-    ProxyPassReverse / http://${host}:${d.dockerPort}/
-    ErrorLog ${"$"}{APACHE_LOG_DIR}/${d.username}_error.log
-    CustomLog ${"$"}{APACHE_LOG_DIR}/${d.username}_access.log combined
-    RewriteEngine on
-    RewriteCond ${"$"}{SERVER_NAME} =${d.domain}.alamhost.com
-    RewriteRule ^ https://%{SERVER_NAME}%{REQUEST_URI} [END,NE,R=permanent]
-</VirtualHost>
-
-# Tahap enable site dan SSL dilakukan backend setelah validasi:
-# a2ensite ${d.username}.conf
-# apache2ctl configtest
-# systemctl reload apache2
-# certbot --apache -d ${d.domain}.alamhost.com
-`;}
+function apache(d){
+ const host=vmInfo[d.vm].ip, domain=d.domain+".alamhost.com", file=d.username+".conf";
+ return "#!/usr/bin/env bash\nset -Eeuo pipefail\nDOMAIN="+domain+"\nVM_IP="+host+"\nDOCKER_PORT="+d.dockerPort+"\nSITE_FILE=/etc/apache2/sites-available/"+file+"\n\n a2enmod proxy proxy_http headers rewrite\ncat > \"$SITE_FILE\" <<'APACHE_EOF'\n<VirtualHost *:80>\n    ServerName "+domain+"\n    ProxyPreserveHost Off\n    RequestHeader set Host \""+host+":"+d.dockerPort+"\"\n    ProxyPass / http://"+host+":"+d.dockerPort+"/\n    ProxyPassReverse / http://"+host+":"+d.dockerPort+"/\n    ErrorLog \${APACHE_LOG_DIR}/"+d.username+"_error.log\n    CustomLog \${APACHE_LOG_DIR}/"+d.username+"_access.log combined\n</VirtualHost>\nAPACHE_EOF\na2ensite "+file+"\napache2ctl configtest\nsystemctl reload apache2\necho 'Pastikan DNS "+domain+" sudah mengarah ke server Apache sebelum menjalankan Certbot.'\ncertbot --apache -d "+domain+"\n";
+}
 function nat(d){const lines=[`/ip firewall nat add chain=dstnat dst-address=103.112.162.253 protocol=tcp dst-port=${d.publicApi} action=dst-nat to-addresses=${d.vpnIp} to-ports=${d.targetApi} comment="${d.username}| API"`,`/ip firewall nat add chain=dstnat dst-address=103.112.162.253 protocol=tcp dst-port=${d.publicWinbox} action=dst-nat to-addresses=${d.vpnIp} to-ports=${d.targetWinbox} comment="${d.username}| Winbox"`];if(d.enableOlt)lines.push(`/ip firewall nat add chain=dstnat dst-address=103.112.162.253 protocol=tcp dst-port=${d.publicOlt} action=dst-nat to-addresses=${d.vpnIp} to-ports=${d.targetOlt} comment="${d.username}| OLT"`);for(const p of d.forwards){if(p.publicPort&&p.targetPort){const note=(p.comment||"Custom forwarding").replace(/[^a-zA-Z0-9 _.-]/g,"").slice(0,32);lines.push(`/ip firewall nat add chain=dstnat dst-address=103.112.162.253 protocol=${p.protocol} dst-port=${p.publicPort} action=dst-nat to-addresses=${d.vpnIp} to-ports=${p.targetPort} comment="${d.username}| ${note}"`);}}return lines.join("\n");}
 function client(d){return `INFO AKSES PELANGGAN
 Username: ${d.username}
