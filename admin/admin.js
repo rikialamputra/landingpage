@@ -46,7 +46,7 @@ function apache(d){const host=vmInfo[d.vm].ip||"DOCKER_VM_IP_FROM_BACKEND";retur
 # systemctl reload apache2
 # certbot --apache -d ${d.domain}.alamhost.com
 `;}
-function nat(d){const lines=[`/ip firewall nat add chain=dstnat dst-address=103.112.162.253 protocol=tcp dst-port=${d.publicApi} action=dst-nat to-addresses=${d.vpnIp} to-ports=${d.targetApi} comment="${d.username}| API"`,`/ip firewall nat add chain=dstnat dst-address=103.112.162.253 protocol=tcp dst-port=${d.publicWinbox} action=dst-nat to-addresses=${d.vpnIp} to-ports=${d.targetWinbox} comment="${d.username}| Winbox"`];if(d.enableOlt)lines.push(`/ip firewall nat add chain=dstnat dst-address=103.112.162.253 protocol=tcp dst-port=${d.publicOlt} action=dst-nat to-addresses=${d.vpnIp} to-ports=${d.targetOlt} comment="${d.username}| OLT"`);return lines.join("\n");}
+function nat(d){const lines=[`/ip firewall nat add chain=dstnat dst-address=103.112.162.253 protocol=tcp dst-port=${d.publicApi} action=dst-nat to-addresses=${d.vpnIp} to-ports=${d.targetApi} comment="${d.username}| API"`,`/ip firewall nat add chain=dstnat dst-address=103.112.162.253 protocol=tcp dst-port=${d.publicWinbox} action=dst-nat to-addresses=${d.vpnIp} to-ports=${d.targetWinbox} comment="${d.username}| Winbox"`];if(d.enableOlt)lines.push(`/ip firewall nat add chain=dstnat dst-address=103.112.162.253 protocol=tcp dst-port=${d.publicOlt} action=dst-nat to-addresses=${d.vpnIp} to-ports=${d.targetOlt} comment="${d.username}| OLT"`);for(const p of d.forwards){if(p.publicPort&&p.targetPort)lines.push(`/ip firewall nat add chain=dstnat dst-address=103.112.162.253 protocol=${p.protocol} dst-port=${p.publicPort} action=dst-nat to-addresses=${d.vpnIp} to-ports=${p.targetPort} comment="${d.username}| ${p.comment||"Custom forwarding"}"`);}return lines.join("\n");}
 function client(d){return `INFO AKSES PELANGGAN
 Username: ${d.username}
 Domain: ${d.domain}.alamhost.com
@@ -71,4 +71,14 @@ document.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>
 $("copyBtn").addEventListener("click",async()=>{if(!state.generated){toast("Generate konfigurasi terlebih dahulu.");return;}try{await navigator.clipboard.writeText(state.outputs[state.active]);toast("Konfigurasi disalin.");}catch{toast("Clipboard tidak tersedia di browser ini.");}});
 document.querySelectorAll("[data-deploy]").forEach(btn=>btn.addEventListener("click",()=>toast("Backend deployment belum terhubung. Belum ada perintah server yang dijalankan.")));
 $("customerForm").addEventListener("reset",()=>setTimeout(()=>{state.generated=false;state.outputs={};$("outputCode").textContent="Isi data pelanggan lalu klik “Generate konfigurasi”.";$("outputState").textContent="Belum dibuat";$("oltFields").classList.add("hidden");render();},0));
+
+function addForwardRow(){const row=document.createElement("div");row.className="forward-row";row.innerHTML='<label class="field"><span>Public port</span><input class="forward-public" type="number" min="1" max="65535" placeholder="Contoh 63210"></label><label class="field"><span>Target port</span><input class="forward-target" type="number" min="1" max="65535" placeholder="Contoh 8729"></label><label class="field"><span>Protocol</span><select class="forward-protocol"><option value="tcp">TCP</option><option value="udp">UDP</option></select></label><label class="field"><span>Keterangan</span><input class="forward-comment" maxlength="32" placeholder="Contoh SSH / OLT"></label><button type="button" class="remove-forward" aria-label="Hapus port forwarding">×</button>'; $("forwardList").appendChild(row);}
+$("addForward").addEventListener("click",addForwardRow);
+$("forwardList").addEventListener("click",e=>{if(e.target.classList.contains("remove-forward"))e.target.closest(".forward-row").remove();});
+$("forwardList").addEventListener("input",()=>{if(state.generated)generate();});
+$("forwardList").addEventListener("change",()=>{if(state.generated)generate();});
+function applyTheme(theme){document.body.dataset.theme=theme;const light=theme==="light";$("themeIcon").textContent=light?"☾":"☀";$("themeLabel").textContent=light?"Dark mode":"Light mode";}
+const savedTheme=localStorage.getItem("alamhost-admin-theme")||"dark";applyTheme(savedTheme);
+$("themeToggle").addEventListener("click",()=>{const next=document.body.dataset.theme==="light"?"dark":"light";applyTheme(next);localStorage.setItem("alamhost-admin-theme",next);});
+
 render();
