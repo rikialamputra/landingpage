@@ -92,20 +92,23 @@ function apache(d){
  ].join("\n");
 }
 function nat(d){const lines=[`/ip firewall nat add chain=dstnat dst-address=103.112.162.253 protocol=tcp dst-port=${d.publicApi} action=dst-nat to-addresses=${d.vpnIp} to-ports=${d.targetApi} comment="${d.username}| API"`,`/ip firewall nat add chain=dstnat dst-address=103.112.162.253 protocol=tcp dst-port=${d.publicWinbox} action=dst-nat to-addresses=${d.vpnIp} to-ports=${d.targetWinbox} comment="${d.username}| Winbox"`];if(d.enableOlt)lines.push(`/ip firewall nat add chain=dstnat dst-address=103.112.162.253 protocol=tcp dst-port=${d.publicOlt} action=dst-nat to-addresses=${d.vpnIp} to-ports=${d.targetOlt} comment="${d.username}| OLT"`);for(const p of d.forwards){if(p.publicPort&&p.targetPort){const note=(p.comment||"Custom forwarding").replace(/[^a-zA-Z0-9 _.-]/g,"").slice(0,32);lines.push(`/ip firewall nat add chain=dstnat dst-address=103.112.162.253 protocol=${p.protocol} dst-port=${p.publicPort} action=dst-nat to-addresses=${d.vpnIp} to-ports=${p.targetPort} comment="${d.username}| ${note}"`);}}return lines.join("\n");}
-function client(d){return `INFO AKSES PELANGGAN
-Username: ${d.username}
-Domain: ${d.domain}.alamhost.com
-Mikhmon: ${d.domain}.alamhost.com
-User: ${d.mikhmonUser}
-Password: ${d.mikhmonPass?"(atur manual di aplikasi Mikhmon)":"(belum diatur)"}
-
-API: ${d.domain}.alamhost.com:${d.publicApi}
-Winbox: ${d.domain}.alamhost.com:${d.publicWinbox}
-
-SCRIPT OPENVPN CLIENT (template dari config-mikhmon.src)
-interface ovpn-client add name=${d.username}@alamhost.com connect-to=${d.domain}.alamhost.com user=${d.vpnUser} password=<ISI_PASSWORD_VPN> disabled=no
-
-Catatan: kredensial perlu diisi dan dibagikan secara aman secara manual. Generator ini tidak terhubung ke backend secret.`;}
+function client(d){
+ const domain=d.domain+".alamhost.com";
+ return [
+  "INFO AKSES PELANGGAN",
+  "Username: "+d.username,
+  "Domain: "+domain,
+  "Mikhmon: "+domain,
+  "User: "+d.mikhmonUser,
+  "Password: "+d.mikhmonPass,
+  "",
+  "API: "+domain+":"+d.publicApi,
+  "Winbox: "+domain+":"+d.publicWinbox,
+  "",
+  "SCRIPT OPENVPN CLIENT",
+  "interface ovpn-client add name="+d.username+"@alamhost.com connect-to="+domain+" user="+d.vpnUser+" password="+d.vpnPass+" disabled=no"
+ ].join("\n");
+}
 function generate(){const d=data();const err=validate(d);if(err){toast(err);return;}state.outputs={docker:dockerScript(d),apache:apache(d),nat:nat(d),client:client(d)};state.generated=true;$("outputState").textContent="Konfigurasi dibuat";$("outputState").style.color="var(--green)";render();$("outputs").scrollIntoView({behavior:"smooth",block:"start"});toast("Konfigurasi berhasil dibuat.");}
 function render(){const d=data();$("targetName").textContent=vmInfo[d.vm].name;$("targetIp").textContent=vmInfo[d.vm].ip||"IP dikelola backend";$("runtimeName").textContent="ROS "+d.ros+" · Docker";$("containerName").textContent="mikhmon-"+d.username;$("summaryPort").textContent=d.dockerPort+" → 80";$("summaryDomain").textContent=d.domain+".alamhost.com";if(state.generated){$("outputCode").textContent=state.outputs[state.active];$("outputTitle").textContent=({docker:"Docker provisioning script (copy & paste)",apache:"Apache VirtualHost",nat:"MikroTik NAT rules",client:"Informasi akses pelanggan"})[state.active];}}
 function toast(msg){const el=$("toast");el.textContent=msg;el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),2800);}
