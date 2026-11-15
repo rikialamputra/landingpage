@@ -26,7 +26,65 @@ services:
       - ./mikhmon-data/${d.username}:/opt/mikhmon/data
     restart: unless-stopped
 `;}
-function dockerScript(d){const base=d.ros==="7"?"/home/alam/mikhmon/":"/home/alam/mikhmon-alamhost/";const template=d.ros==="7"?"ros7":"ros6";let lines=[`cd ${base}`,`# Pastikan folder tujuan belum ada; jangan hapus data pelanggan yang sudah ada.`,`test ! -e "${d.username}" || { echo "Folder ${d.username} sudah ada; batalkan agar data tidak tertimpa."; exit 1; }`,`cp -a ${template} ${d.username}`];if(d.ros==="7")lines.push(`mv ${d.username}/mikhmon-data ${d.username}/mikhmon-data-${d.username}`);else lines.push(`mkdir -p ${d.username}/mikhmon-data/${d.username}`);lines.push(`cd ${d.username}`,`# Simpan docker-compose.yml hasil generator pada folder ini.`,`docker-compose up -d`,`docker ps --filter "name=mikhmon-${d.username}"`);return lines.join("\n");}
+function dockerScript(d){
+  const base=d.ros==="7"?"/home/alam/mikhmon":"/home/alam/mikhmon-alamhost";
+  const template=d.ros==="7"?"ros7":"ros6";
+  const customer="mikhmon-"+d.username;
+  const folder=d.username;
+  const volume=d.ros==="7"?"./mikhmon-data-"+d.username+":/var/www/html":"./mikhmon-data/"+d.username+":/opt/mikhmon/data";
+  const image=d.ros==="7"?"stbbaru2024/mikhmonros7":"animegasan/mikhmon:v3-latest";
+  const compose=d.ros==="7"
+    ? 'version: "3.9"\nservices:\n  mikhmon:\n    image: '+image+'\n    container_name: '+customer+'\n    ports:\n      - "'+d.dockerPort+':80"\n    volumes:\n      - '+volume+'\n    restart: unless-stopped\n'
+    : "version: '3.8'\nservices:\n  "+customer+":\n    image: "+image+"\n    container_name: "+customer+"\n    ports:\n      - \\""+d.dockerPort+":80\\"\n    volumes:\n      - "+volume+"\n    restart: unless-stopped\n";
+  const customerPath=base+"/"+folder;
+  const cronPath=customerPath+"/auto_restart.sh";
+  const logPath=customerPath+"/restart_log.txt";
+  const q=v=>"'"+String(v).replace(/'/g,"'\\''")+"'";
+  const lines=[
+    "#!/usr/bin/env bash",
+    "set -Eeuo pipefail",
+    "BASE_DIR="+q(base),
+    "TEMPLATE_DIR="+q(template),
+    "CUSTOMER_DIR="+q(folder),
+    "CONTAINER_NAME="+q(customer),
+    "cd \\"$BASE_DIR\\"",
+    "if [[ -e \\"$CUSTOMER_DIR\\" ]]; then echo \\"Folder pelanggan sudah ada. Proses dibatalkan agar data lama tidak tertimpa.\\" >&2; exit 1; fi",
+    "if [[ ! -d \\"$TEMPLATE_DIR\\" ]]; then echo \\"Template $TEMPLATE_DIR tidak ditemukan di $BASE_DIR\\" >&2; exit 1; fi",
+    "command -v docker-compose >/dev/null 2>&1 || { echo 'docker-compose belum terpasang.' >&2; exit 1; }",
+    "cp -a \\"$TEMPLATE_DIR\\" \\"$CUSTOMER_DIR\\"",
+    "cd \\"$CUSTOMER_DIR\\"",
+    d.ros==="7"?"mv mikhmon-data "+q("mikhmon-data-"+folder):"mkdir -p "+q("mikhmon-data/"+folder),
+    "cat > docker-compose.yml <<'COMPOSE_EOF'",
+    ...compose.trimEnd().split("\n"),
+    "COMPOSE_EOF",
+    "docker-compose up -d",
+    "cat > auto_restart.sh <<'RESTART_EOF'",
+    "#!/usr/bin/env bash",
+    "CONTAINER_NAME="+q(customer),
+    "URL="+q("http://localhost:"+d.dockerPort),
+    "TIMEOUT=10",
+    "LOG_FILE="+q(logPath),
+    "if ! docker inspect \\"$CONTAINER_NAME\\" >/dev/null 2>&1; then exit 0; fi",
+    "STARTED_AT=$(docker inspect -f '{{.State.StartedAt}}' \\"$CONTAINER_NAME\\")",
+    "STARTED_SEC=$(date -d \\"$STARTED_AT\\" +%s 2>/dev/null || echo 0)",
+    "NOW_SEC=$(date +%s)",
+    "UPTIME_SEC=$((NOW_SEC - STARTED_SEC))",
+    "if [[ \\"$STARTED_SEC\\" -eq 0 || \\"$UPTIME_SEC\\" -lt 120 ]]; then exit 0; fi",
+    "HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time \\"$TIMEOUT\\" \\"$URL\\" || true)",
+    "if [[ \\"$HTTP_CODE\\" != 200 && \\"$HTTP_CODE\\" != 302 ]]; then",
+    "  echo \\"$(date): Web tidak sehat (HTTP $HTTP_CODE). Restart $CONTAINER_NAME\\" >> \\"$LOG_FILE\\"",
+    "  docker restart \\"$CONTAINER_NAME\\" >/dev/null",
+    "fi",
+    "RESTART_EOF",
+    "chmod +x auto_restart.sh",
+    "CRON_LINE='* * * * * "+cronPath+" >/dev/null 2>&1'",
+    "(crontab -l 2>/dev/null | grep -Fv "+q(cronPath)+" || true; echo \\"$CRON_LINE\\") | crontab -",
+    "echo 'Provisioning selesai. Container:'",
+    "docker ps --filter \\"name=$CONTAINER_NAME\\"",
+    "echo 'Cron autorestart aktif: "+cronPath+"'"
+  ];
+  return lines.join("\n");
+}
 function apache(d){const host=vmInfo[d.vm].ip||"DOCKER_VM_IP_FROM_BACKEND";return `<VirtualHost *:80>
     ServerName ${d.domain}.alamhost.com
     ProxyPreserveHost Off
@@ -61,8 +119,8 @@ SCRIPT OPENVPN CLIENT (template dari config-mikhmon.src)
 interface ovpn-client add name=${d.username}@alamhost.com connect-to=${d.domain}.alamhost.com user=${d.vpnUser} password=<ISI_PASSWORD_VPN> disabled=no
 
 Catatan: kredensial perlu diisi dan dibagikan secara aman secara manual. Generator ini tidak terhubung ke backend secret.`;}
-function generate(){const d=data();const err=validate(d);if(err){toast(err);return;}state.outputs={docker:compose(d)+"\n\n# Provisioning steps\n"+dockerScript(d),apache:apache(d),nat:nat(d),client:client(d)};state.generated=true;$("outputState").textContent="Konfigurasi dibuat";$("outputState").style.color="var(--green)";render();$("outputs").scrollIntoView({behavior:"smooth",block:"start"});toast("Konfigurasi berhasil dibuat.");}
-function render(){const d=data();$("targetName").textContent=vmInfo[d.vm].name;$("targetIp").textContent=vmInfo[d.vm].ip||"IP dikelola backend";$("runtimeName").textContent="ROS "+d.ros+" · Docker";$("containerName").textContent="mikhmon-"+d.username;$("summaryPort").textContent=d.dockerPort+" → 80";$("summaryDomain").textContent=d.domain+".alamhost.com";if(state.generated){$("outputCode").textContent=state.outputs[state.active];$("outputTitle").textContent=({docker:"docker-compose.yml + provisioning",apache:"Apache VirtualHost",nat:"MikroTik NAT rules",client:"Informasi akses pelanggan"})[state.active];}}
+function generate(){const d=data();const err=validate(d);if(err){toast(err);return;}state.outputs={docker:dockerScript(d),apache:apache(d),nat:nat(d),client:client(d)};state.generated=true;$("outputState").textContent="Konfigurasi dibuat";$("outputState").style.color="var(--green)";render();$("outputs").scrollIntoView({behavior:"smooth",block:"start"});toast("Konfigurasi berhasil dibuat.");}
+function render(){const d=data();$("targetName").textContent=vmInfo[d.vm].name;$("targetIp").textContent=vmInfo[d.vm].ip||"IP dikelola backend";$("runtimeName").textContent="ROS "+d.ros+" · Docker";$("containerName").textContent="mikhmon-"+d.username;$("summaryPort").textContent=d.dockerPort+" → 80";$("summaryDomain").textContent=d.domain+".alamhost.com";if(state.generated){$("outputCode").textContent=state.outputs[state.active];$("outputTitle").textContent=({docker:"Docker provisioning script (copy & paste)",apache:"Apache VirtualHost",nat:"MikroTik NAT rules",client:"Informasi akses pelanggan"})[state.active];}}
 function toast(msg){const el=$("toast");el.textContent=msg;el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),2800);}
 $("generateBtn").addEventListener("click",generate);
 $("dockerVm").addEventListener("change",render);$("ros").addEventListener("change",render);["username","dockerPort","domain"].forEach(id=>$(id).addEventListener("input",render));
