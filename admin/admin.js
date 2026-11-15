@@ -27,41 +27,31 @@ services:
     restart: unless-stopped
 `;}
 function dockerScript(d){
-  const base=d.ros==="7"?"/home/alam/mikhmon":"/home/alam/mikhmon-alamhost";
-  const template=d.ros==="7"?"ros7":"ros6";
-  const customer="mikhmon-"+d.username, folder=d.username;
-  const volume=d.ros==="7"?"./mikhmon-data-"+folder+":/var/www/html":"./mikhmon-data/"+folder+":/opt/mikhmon/data";
-  const image=d.ros==="7"?"stbbaru2024/mikhmonros7":"animegasan/mikhmon:v3-latest";
-  const compose=d.ros==="7"
-    ? 'version: "3.9"\nservices:\n  mikhmon:\n    image: '+image+'\n    container_name: '+customer+'\n    ports:\n      - "'+d.dockerPort+':80"\n    volumes:\n      - '+volume+'\n    restart: unless-stopped\n'
-    : "version: '3.8'\nservices:\n  "+customer+":\n    image: "+image+"\n    container_name: "+customer+"\n    ports:\n      - \\""+d.dockerPort+":80\\"\n    volumes:\n      - "+volume+"\n    restart: unless-stopped\n";
-  const customerPath=base+"/"+folder, cronPath=customerPath+"/auto_restart.sh", logPath=customerPath+"/restart_log.txt";
-  const q=v=>"'"+String(v).replace(/'/g,"'\\''")+"'";
-  const lines=[
-    "#!/usr/bin/env bash","set -Eeuo pipefail",
-    "BASE_DIR="+q(base),"TEMPLATE_DIR="+q(template),"CUSTOMER_DIR="+q(folder),"CONTAINER_NAME="+q(customer),
-    "cd \"$BASE_DIR\"",
-    "if [[ -e \"$CUSTOMER_DIR\" ]]; then echo \"Folder pelanggan sudah ada; batal tanpa menghapus data.\" >&2; exit 1; fi",
-    "if [[ ! -d \"$TEMPLATE_DIR\" ]]; then echo \"Template tidak ditemukan: $BASE_DIR/$TEMPLATE_DIR\" >&2; exit 1; fi",
-    "command -v docker-compose >/dev/null 2>&1 || { echo 'docker-compose belum terpasang.' >&2; exit 1; }",
-    "cp -a \"$TEMPLATE_DIR\" \"$CUSTOMER_DIR\"","cd \"$CUSTOMER_DIR\"",
-    d.ros==="7"?"mv mikhmon-data "+q("mikhmon-data-"+folder):"mkdir -p "+q("mikhmon-data/"+folder),
-    "cat > docker-compose.yml <<'COMPOSE_EOF'",...compose.trimEnd().split("\n"),"COMPOSE_EOF","docker-compose up -d",
-    "cat > auto_restart.sh <<'RESTART_EOF'","#!/usr/bin/env bash",
-    "CONTAINER_NAME="+q(customer),"URL="+q("http://localhost:"+d.dockerPort),"TIMEOUT=10","LOG_FILE="+q(logPath),
-    "if ! docker inspect \"$CONTAINER_NAME\" >/dev/null 2>&1; then exit 0; fi",
-    "STARTED_AT=$(docker inspect -f '{{.State.StartedAt}}' \"$CONTAINER_NAME\")",
-    "STARTED_SEC=$(date -d \"$STARTED_AT\" +%s 2>/dev/null || echo 0)","NOW_SEC=$(date +%s)","UPTIME_SEC=$((NOW_SEC - STARTED_SEC))",
-    "if [[ \"$STARTED_SEC\" -eq 0 || \"$UPTIME_SEC\" -lt 120 ]]; then exit 0; fi",
-    "HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time \"$TIMEOUT\" \"$URL\" || true)",
-    "if [[ \"$HTTP_CODE\" != 200 && \"$HTTP_CODE\" != 302 ]]; then",
-    " echo \"$(date): Web tidak sehat (HTTP $HTTP_CODE). Restart $CONTAINER_NAME\" >> \"$LOG_FILE\"",
-    " docker restart \"$CONTAINER_NAME\" >/dev/null","fi","RESTART_EOF","chmod +x auto_restart.sh",
-    "CRON_LINE="+q("* * * * * "+cronPath+" >/dev/null 2>&1"),
-    "(crontab -l 2>/dev/null | grep -Fv "+q(cronPath)+" || true; echo \"$CRON_LINE\") | crontab - -",
-    "echo 'Provisioning selesai:'","docker ps --filter \"name=$CONTAINER_NAME\""
-  ];
-  return lines.join("\\n");
+ const base=d.ros==="7"?"/home/alam/mikhmon":"/home/alam/mikhmon-alamhost";
+ const template=d.ros==="7"?"ros7":"ros6";
+ const folder=d.username,container="mikhmon-"+d.username;
+ const image=d.ros==="7"?"stbbaru2024/mikhmonros7":"animegasan/mikhmon:v3-latest";
+ const volume=d.ros==="7"?"./mikhmon-data-"+folder+":/var/www/html":"./mikhmon-data/"+folder+":/opt/mikhmon/data";
+ const service=d.ros==="7"?"mikhmon":container;
+ const compose="version: '"+(d.ros==="7"?"3.9":"3.8")+"'\\nservices:\\n  "+service+":\\n    image: "+image+"\\n    container_name: "+container+"\\n    ports:\\n      - '"+d.dockerPort+":80'\\n    volumes:\\n      - "+volume+"\\n    restart: unless-stopped\\n";
+ const path=base+"/"+folder,cron=path+"/auto_restart.sh",log=path+"/restart_log.txt";
+ const q=v=>"'"+String(v).replace(/'/g,"'\\''")+"'";
+ const lines=["#!/usr/bin/env bash","set -Eeuo pipefail","BASE_DIR="+q(base),"TEMPLATE_DIR="+q(template),"CUSTOMER_DIR="+q(folder),"CONTAINER_NAME="+q(container),
+ "cd \"$BASE_DIR\"","if [[ -e \"$CUSTOMER_DIR\" ]]; then echo 'Folder pelanggan sudah ada; dibatalkan agar data tidak tertimpa.' >&2; exit 1; fi",
+ "if [[ ! -d \"$TEMPLATE_DIR\" ]]; then echo 'Folder template tidak ditemukan.' >&2; exit 1; fi",
+ "command -v docker-compose >/dev/null 2>&1 || { echo 'docker-compose belum tersedia.' >&2; exit 1; }",
+ "cp -a \"$TEMPLATE_DIR\" \"$CUSTOMER_DIR\"","cd \"$CUSTOMER_DIR\"",
+ d.ros==="7"?"mv mikhmon-data "+q("mikhmon-data-"+folder):"mkdir -p "+q("mikhmon-data/"+folder),
+ "cat > docker-compose.yml <<'COMPOSE_EOF'",...compose.trimEnd().split("\\n"),"COMPOSE_EOF","docker-compose up -d",
+ "cat > auto_restart.sh <<'RESTART_EOF'","#!/usr/bin/env bash","CONTAINER_NAME="+q(container),"URL="+q("http://localhost:"+d.dockerPort),"TIMEOUT=10","LOG_FILE="+q(log),
+ "if ! docker inspect \"$CONTAINER_NAME\" >/dev/null 2>&1; then exit 0; fi","STARTED_AT=$(docker inspect -f '{{.State.StartedAt}}' \"$CONTAINER_NAME\")",
+ "STARTED_SEC=$(date -d \"$STARTED_AT\" +%s 2>/dev/null || echo 0)","NOW_SEC=$(date +%s)","UPTIME_SEC=$((NOW_SEC - STARTED_SEC))",
+ "if [[ \"$STARTED_SEC\" -eq 0 || \"$UPTIME_SEC\" -lt 120 ]]; then exit 0; fi",
+ "HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time \"$TIMEOUT\" \"$URL\" || true)",
+ "if [[ \"$HTTP_CODE\" != 200 && \"$HTTP_CODE\" != 302 ]]; then"," echo \"$(date): Web hang (HTTP $HTTP_CODE). Restart container.\" >> \"$LOG_FILE\""," docker restart \"$CONTAINER_NAME\" >/dev/null","fi","RESTART_EOF","chmod +x auto_restart.sh",
+ "CRON_LINE="+q("* * * * * "+cron+" >/dev/null 2>&1"),"(crontab -l 2>/dev/null | grep -Fv "+q(cron)+" || true; echo \"$CRON_LINE\") | crontab -",
+ "docker ps --filter \"name=$CONTAINER_NAME\""];
+ return lines.join("\\n");
 }
 function apache(d){const host=vmInfo[d.vm].ip||"DOCKER_VM_IP_FROM_BACKEND";return `<VirtualHost *:80>
     ServerName ${d.domain}.alamhost.com
