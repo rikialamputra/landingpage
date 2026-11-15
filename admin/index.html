@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#0b1110">
+  <title>Mikhmon Provisioning · AlamHost</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./admin.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="../index.html"><span class="brand-mark">A</span><span>ALAM<span class="accent">HOST</span><small>CONTROL CENTER</small></span></a>
+      <div class="side-label">WORKSPACE</div>
+      <a class="nav-item active" href="#provision"><span>▦</span> Mikhmon Provisioning</a>
+      <a class="nav-item muted" href="#activity"><span>◷</span> Deployment Activity <em>soon</em></a>
+      <div class="sidebar-bottom"><span class="status-dot"></span> UI Prototype <small>Backend belum terhubung</small></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div><div class="eyebrow">ALAMHOST / INTERNAL TOOLS</div><h1>Mikhmon Provisioning</h1></div>
+        <div class="top-actions"><span class="env-chip"><i></i> DEVELOPMENT</span><a class="back-link" href="../index.html">↗ Landing page</a></div>
+      </header>
+
+      <section class="intro">
+        <div><div class="eyebrow">CUSTOMER DEPLOYMENT</div><h2>Provisioning pelanggan baru<span>.</span></h2><p>Generate konfigurasi Docker, Apache, NAT MikroTik, dan informasi akses pelanggan dari satu form.</p></div>
+        <div class="intro-mark">AH<span>/</span>OPS</div>
+      </section>
+
+      <div class="notice"><strong>Mode pratinjau.</strong> Halaman ini baru menyiapkan form dan generator konfigurasi. Tombol deploy belum mengeksekusi server sampai backend dan autentikasi dipasang di Apache.</div>
+
+      <section class="workspace" id="provision">
+        <div class="form-column">
+          <div class="section-head"><div><span class="step">01</span><h3>Data pelanggan</h3></div><span class="required-note">* Wajib diisi</span></div>
+          <form id="customerForm">
+            <div class="field-grid">
+              <label class="field"><span>Username pelanggan *</span><input id="username" value="gassp5" required pattern="[a-zA-Z0-9_-]{3,32}" autocomplete="off"><small>Dipakai untuk nama folder, container, dan subdomain.</small></label>
+              <label class="field"><span>Versi RouterOS *</span><select id="ros"><option value="7">RouterOS 7</option><option value="6">RouterOS 6</option></select></label>
+              <label class="field full"><span>Docker VM tujuan *</span><select id="dockerVm"><option value="vm1">Docker VM 1 — 192.168.200.177</option><option value="vm2">Docker VM 2 — IP diatur di backend</option><option value="vm3">Docker VM 3 — IP diatur di backend</option></select><small>Pemilihan VM manual. IP dan SSH key dikelola di konfigurasi backend, bukan browser.</small></label>
+              <label class="field"><span>IP VPN pelanggan *</span><input id="vpnIp" value="10.5.0.149" inputmode="decimal" required></label>
+              <label class="field"><span>IP Docker host</span><input id="dockerIp" placeholder="Diisi otomatis dari konfigurasi backend" disabled></label>
+              <label class="field"><span>Port host Docker *</span><input id="dockerPort" type="number" min="1" max="65535" value="8290" required></label>
+              <label class="field"><span>Domain pelanggan</span><div class="input-suffix"><input id="domain" value="gassp5" autocomplete="off"><b>.alamhost.com</b></div></label>
+            </div>
+
+            <div class="section-head subhead"><div><span class="step">02</span><h3>Port akses MikroTik</h3></div></div>
+            <div class="field-grid">
+              <label class="field"><span>Public API port *</span><input id="publicApi" type="number" min="1" max="65535" value="63208"></label>
+              <label class="field"><span>Target API port</span><input id="targetApi" type="number" min="1" max="65535" value="8728"></label>
+              <label class="field"><span>Public Winbox port *</span><input id="publicWinbox" type="number" min="1" max="65535" value="63209"></label>
+              <label class="field"><span>Target Winbox port</span><input id="targetWinbox" type="number" min="1" max="65535" value="8291"></label>
+            </div>
+            <label class="toggle-row"><input type="checkbox" id="enableOlt"><span class="toggle"></span><span><b>Tambahkan forwarding OLT</b><small>Opsional · default tidak aktif</small></span></label>
+            <div class="field-grid olt-fields hidden" id="oltFields">
+              <label class="field"><span>Public OLT port</span><input id="publicOlt" type="number" value="49115"></label>
+              <label class="field"><span>Target OLT port</span><input id="targetOlt" type="number" value="80"></label>
+            </div>
+
+            <div class="section-head subhead"><div><span class="step">03</span><h3>Informasi akses pelanggan</h3></div></div>
+            <div class="field-grid">
+              <label class="field"><span>Username Mikhmon</span><input id="mikhmonUser" value="mikhmon"></label>
+              <label class="field"><span>Password Mikhmon</span><input id="mikhmonPass" type="password" placeholder="Isi saat backend sudah dikonfigurasi"></label>
+              <label class="field"><span>Username OpenVPN</span><input id="vpnUser" value="gassp5"></label>
+              <label class="field"><span>Password OpenVPN</span><input id="vpnPass" type="password" placeholder="Isi saat backend sudah dikonfigurasi"></label>
+            </div>
+            <div class="form-actions"><button type="button" class="btn btn-primary" id="generateBtn">Generate konfigurasi <span>→</span></button><button type="reset" class="btn btn-ghost">Reset form</button></div>
+          </form>
+        </div>
+
+        <aside class="summary-column">
+          <div class="summary-card">
+            <div class="summary-title">DEPLOYMENT TARGET <span class="live-indicator">● MANUAL</span></div>
+            <div class="target-name" id="targetName">Docker VM 1</div><div class="target-ip" id="targetIp">192.168.200.177</div>
+            <div class="summary-divider"></div>
+            <div class="summary-row"><span>Runtime</span><b id="runtimeName">ROS 7 · Docker</b></div>
+            <div class="summary-row"><span>Container</span><b id="containerName">mikhmon-gassp5</b></div>
+            <div class="summary-row"><span>Host port</span><b id="summaryPort">8290 → 80</b></div>
+            <div class="summary-row"><span>Domain</span><b id="summaryDomain">gassp5.alamhost.com</b></div>
+          </div>
+          <div class="pipeline-card">
+            <div class="summary-title">DEPLOYMENT PIPELINE</div>
+            <div class="pipeline-step"><span class="pipeline-icon">1</span><div><b>Docker</b><small>Copy template + Compose up</small></div><span class="pending">WAITING</span></div>
+            <div class="pipeline-step"><span class="pipeline-icon">2</span><div><b>Apache & SSL</b><small>VirtualHost + Certbot</small></div><span class="pending">WAITING</span></div>
+            <div class="pipeline-step"><span class="pipeline-icon">3</span><div><b>MikroTik NAT</b><small>API, Winbox, optional OLT</small></div><span class="pending">WAITING</span></div>
+          </div>
+          <div class="safe-note"><span>⌁</span><div><b>Credential safety</b><small>SSH private key dan kredensial RouterOS tidak disimpan di halaman web. Nantinya dikelola oleh backend Apache.</small></div></div>
+        </aside>
+      </section>
+
+      <section class="outputs" id="outputs">
+        <div class="section-head"><div><span class="step">04</span><h3>Generated configuration</h3></div><span class="output-state" id="outputState">Belum dibuat</span></div>
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="docker">Docker Compose</button><button class="tab" data-tab="apache">Apache / SSL</button><button class="tab" data-tab="nat">MikroTik NAT</button><button class="tab" data-tab="client">Info Client</button>
+        </div>
+        <div class="output-panel">
+          <div class="output-toolbar"><span id="outputTitle">docker-compose.yml</span><button class="copy-btn" id="copyBtn">Copy config</button></div>
+          <pre id="outputCode">Isi data pelanggan lalu klik “Generate konfigurasi”.</pre>
+        </div>
+        <div class="deploy-actions">
+          <div><b>Deployment terpisah</b><small>Setiap komponen dapat dijalankan secara independen setelah backend aktif.</small></div>
+          <div class="deploy-buttons"><button class="btn btn-deploy" data-deploy="docker" disabled>Deploy Docker</button><button class="btn btn-deploy" data-deploy="apache" disabled>Deploy Apache</button><button class="btn btn-deploy" data-deploy="nat" disabled>Deploy NAT</button></div>
+        </div>
+      </section>
+      <footer id="activity"><span>ALAMHOST CONTROL CENTER</span><span>Internal tooling · Build preview</span></footer>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="./admin.js"></script>
+</body>
+</html>
